@@ -29,6 +29,13 @@ import (
 )
 
 // This test passes ctrl+c signal which blocks running of all other tests.
+func TestMain(m *testing.M) {
+	// Prevent the code under test from terminating the test process via os.Exit.
+	// basicportforwarding.go exposes `exitFunc` which defaults to os.Exit; override it here.
+	exitFunc = func(code int) {}
+	os.Exit(m.Run())
+}
+
 func TestSetSessionHandlers(t *testing.T) {
 	mockLog.Infof("TestStartSession!!!!!")
 	out, in := net.Pipe()

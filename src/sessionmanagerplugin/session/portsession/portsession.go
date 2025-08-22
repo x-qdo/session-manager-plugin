@@ -107,6 +107,9 @@ func (s *PortSession) Initialize(log log.T, sessionVar *session.Session) {
 
 func (s *PortSession) Stop() {
 	s.portSessionType.Stop()
+	if ic := GetPortSessionInterceptor(); ic != nil {
+		_ = ic.Close()
+	}
 }
 
 // StartSession redirects inputStream/outputStream data to datachannel.

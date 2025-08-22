@@ -87,7 +87,7 @@ func (p *MuxPortForwarding) Stop() {
 		p.muxClient.close()
 	}
 	p.cleanUp()
-	os.Exit(0)
+	exitFunc(0)
 }
 
 // InitializeStreams initializes i/o streams
@@ -232,21 +232,33 @@ func (p *MuxPortForwarding) handleClientConnections(log log.T, ctx context.Conte
 		displayMsg string
 	)
 
-	if p.portParameters.LocalConnectionType == "unix" {
-		if listener, err = net.Listen(p.portParameters.LocalConnectionType, p.portParameters.LocalUnixSocket); err != nil {
-			return err
+	// Allow interceptor to provide a custom listener (e.g., in-memory) so we don't expose a local TCP port.
+	if ic := GetPortSessionInterceptor(); ic != nil {
+		if l, ok, ierr := ic.AcquireListener(log, &p.session, p.portParameters); ierr != nil {
+			return ierr
+		} else if ok && l != nil {
+			listener = l
+			displayMsg = fmt.Sprintf("Using interceptor-provided listener for sessionId %s.", p.sessionId)
 		}
-		displayMsg = fmt.Sprintf("Unix socket %s opened for sessionId %s.", p.portParameters.LocalUnixSocket, p.sessionId)
-	} else {
-		localPortNumber := p.portParameters.LocalPortNumber
-		if p.portParameters.LocalPortNumber == "" {
-			localPortNumber = "0"
+	}
+
+	if listener == nil {
+		if p.portParameters.LocalConnectionType == "unix" {
+			if listener, err = net.Listen(p.portParameters.LocalConnectionType, p.portParameters.LocalUnixSocket); err != nil {
+				return err
+			}
+			displayMsg = fmt.Sprintf("Unix socket %s opened for sessionId %s.", p.portParameters.LocalUnixSocket, p.sessionId)
+		} else {
+			localPortNumber := p.portParameters.LocalPortNumber
+			if p.portParameters.LocalPortNumber == "" {
+				localPortNumber = "0"
+			}
+			if listener, err = net.Listen("tcp", "localhost:"+localPortNumber); err != nil {
+				return err
+			}
+			p.portParameters.LocalPortNumber = strconv.Itoa(listener.Addr().(*net.TCPAddr).Port)
+			displayMsg = fmt.Sprintf("Port %s opened for sessionId %s.", p.portParameters.LocalPortNumber, p.sessionId)
 		}
-		if listener, err = net.Listen("tcp", "localhost:"+localPortNumber); err != nil {
-			return err
-		}
-		p.portParameters.LocalPortNumber = strconv.Itoa(listener.Addr().(*net.TCPAddr).Port)
-		displayMsg = fmt.Sprintf("Port %s opened for sessionId %s.", p.portParameters.LocalPortNumber, p.sessionId)
 	}
 
 	defer listener.Close()
