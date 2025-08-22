@@ -56,12 +56,15 @@ func (p *BasicPortForwarding) IsStreamNotSet() (status bool) {
 	return p.stream == nil
 }
 
+// exitFunc allows tests to override os.Exit behavior.
+var exitFunc = os.Exit
+
 // Stop closes the stream
 func (p *BasicPortForwarding) Stop() {
 	if p.stream != nil {
 		(*p.stream).Close()
 	}
-	os.Exit(0)
+	exitFunc(0)
 }
 
 // InitializeStreams establishes connection and initializes the stream
@@ -82,10 +85,13 @@ func (p *BasicPortForwarding) ReadStream(log log.T) (err error) {
 			log.Debugf("Reading from port %s failed with error: %v. Close this connection, listen and accept new one.",
 				p.portParameters.PortNumber, err)
 
-			// Send DisconnectToPort flag to agent when client tcp connection drops to ensure agent closes tcp connection too with server port
-			if err = p.session.DataChannel.SendFlag(log, message.DisconnectToPort); err != nil {
-				log.Errorf("Failed to send packet: %v", err)
-				return err
+			// Send DisconnectToPort flag to agent when client connection drops to ensure agent closes its upstream connection to the server port.
+			// If an interceptor provided the client connection (no local listener), do not send the flag since the interceptor manages the connection lifecycle.
+			if p.listener != nil {
+				if err = p.session.DataChannel.SendFlag(log, message.DisconnectToPort); err != nil {
+					log.Errorf("Failed to send packet: %v", err)
+					return err
+				}
 			}
 
 			if err = p.reconnect(log); err != nil {
@@ -114,6 +120,19 @@ func (p *BasicPortForwarding) WriteStream(outputMessage message.ClientMessage) e
 
 // startLocalConn establishes a new local connection to forward remote server packets to
 func (p *BasicPortForwarding) startLocalConn(log log.T) (err error) {
+	// A pluggable interceptor can provide a pre-established client connection to bypass creating a local listener.
+	if ic := GetPortSessionInterceptor(); ic != nil {
+		if conn, ok, ierr := ic.AcquireClientConn(log, &p.session, p.portParameters); ierr != nil {
+			return ierr
+		} else if ok {
+			p.listener = nil
+			p.stream = &conn
+			log.Infof("Using interceptor-provided client connection for session %s.", p.sessionId)
+			fmt.Printf("Using interceptor-provided client connection for session %s.\n", p.sessionId)
+			return nil
+		}
+	}
+
 	// When localPortNumber is not specified, set port number to 0 to let net.conn choose an open port at random
 	localPortNumber := p.portParameters.LocalPortNumber
 	if p.portParameters.LocalPortNumber == "" {
@@ -187,6 +206,19 @@ func (p *BasicPortForwarding) handleControlSignals(log log.T) {
 func (p *BasicPortForwarding) reconnect(log log.T) (err error) {
 	// close existing connection as it is in a state from which data cannot be read
 	(*p.stream).Close()
+
+	// If no listener is available, try to acquire a new client connection from the interceptor.
+	if p.listener == nil {
+		if ic := GetPortSessionInterceptor(); ic != nil {
+			if conn, ok, ierr := ic.AcquireClientConn(log, &p.session, p.portParameters); ierr != nil {
+				return ierr
+			} else if ok {
+				p.stream = &conn
+				return nil
+			}
+		}
+		return log.Errorf("No listener available and interceptor did not provide a new connection")
+	}
 
 	// wait for new connection on listener and accept it
 	var conn net.Conn
