@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	"github.com/aws/session-manager-plugin/src/ssmclicommands/utils"
-	"github.com/twinj/uuid"
 )
 
 const (
@@ -87,7 +86,7 @@ func ParseCliCommand(args []string) (err error, options []string, command string
 
 // ValidateInput function validates the input and displays response accordingly.
 func ValidateInput(args []string, out io.Writer) {
-	uuid.SwitchFormat(uuid.CleanHyphen)
+	// google/uuid does not require switching format
 
 	if len(args) < ArgumentLength {
 		utils.DisplayCommandUsage(out)

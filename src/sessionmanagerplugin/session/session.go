@@ -33,7 +33,7 @@ import (
 	"github.com/aws/session-manager-plugin/src/sdkutil"
 	"github.com/aws/session-manager-plugin/src/sessionmanagerplugin/session/sessionutil"
 	"github.com/aws/session-manager-plugin/src/version"
-	"github.com/twinj/uuid"
+	"github.com/google/uuid"
 )
 
 const (
@@ -140,7 +140,6 @@ func ValidateInputAndStartSession(args []string, out io.Writer) {
 		target             string
 	)
 	log := log.Logger(true, "session-manager-plugin")
-	uuid.SwitchFormat(uuid.CleanHyphen)
 
 	if len(args) == 1 {
 		fmt.Fprint(out, "\nThe Session Manager plugin was installed successfully. "+
@@ -187,7 +186,7 @@ func ValidateInputAndStartSession(args []string, out io.Writer) {
 		}
 	}
 	sdkutil.SetRegionAndProfile(region, profile)
-	clientId := uuid.NewV4().String()
+	clientId := uuid.New().String()
 
 	switch operationName {
 	case StartSessionOperation:
