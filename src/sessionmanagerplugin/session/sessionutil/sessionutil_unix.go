@@ -27,6 +27,19 @@ import (
 	"github.com/aws/session-manager-plugin/src/message"
 )
 
+// userOut is the output writer for session display; defaults to os.Stdout
+var userOut io.Writer = os.Stdout
+
+// SetUserOut allows callers to override output destination for shell output.
+// If w is nil, it resets to os.Stdout.
+func SetUserOut(w io.Writer) {
+	if w != nil {
+		userOut = w
+	} else {
+		userOut = os.Stdout
+	}
+}
+
 type DisplayMode struct {
 }
 
@@ -35,7 +48,7 @@ func (d *DisplayMode) InitDisplayMode(log log.T) {
 
 // DisplayMessage function displays the output on the screen
 func (d *DisplayMode) DisplayMessage(log log.T, message message.ClientMessage) {
-	var out io.Writer = os.Stdout
+	var out io.Writer = userOut
 	fmt.Fprint(out, string(message.Payload))
 }
 
