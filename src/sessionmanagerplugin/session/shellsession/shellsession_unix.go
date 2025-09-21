@@ -48,6 +48,18 @@ func ConfigureIO(r io.Reader, w io.Writer) {
 	}
 }
 
+// UserIn returns the current configured input stream for the shell session.
+// When not overridden, this is os.Stdin.
+func UserIn() io.Reader {
+	return userIn
+}
+
+// UserOut returns the current configured output stream for the shell session.
+// When not overridden, this is os.Stdout.
+func UserOut() io.Writer {
+	return userOut
+}
+
 // disableEchoAndInputBuffering disables echo to avoid double echo and disable input buffering
 func (s *ShellSession) disableEchoAndInputBuffering() {
 	if userIn == os.Stdin && userOut == os.Stdout {
