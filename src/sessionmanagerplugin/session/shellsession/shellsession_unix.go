@@ -20,6 +20,7 @@ package shellsession
 import (
 	"bufio"
 	"bytes"
+	"io"
 	"os"
 	"os/exec"
 	"time"
@@ -28,27 +29,56 @@ import (
 	"github.com/aws/session-manager-plugin/src/message"
 )
 
+// user-configurable IO for shell session. Defaults to stdio for backward compatibility.
+var userIn io.Reader = os.Stdin
+var userOut io.Writer = os.Stdout
+
+// ConfigureIO allows callers to override the input and output streams used by the
+// session-manager shell plugin. Pass nil to use OS stdio defaults.
+func ConfigureIO(r io.Reader, w io.Writer) {
+	if r != nil {
+		userIn = r
+	} else {
+		userIn = os.Stdin
+	}
+	if w != nil {
+		userOut = w
+	} else {
+		userOut = os.Stdout
+	}
+}
+
 // disableEchoAndInputBuffering disables echo to avoid double echo and disable input buffering
 func (s *ShellSession) disableEchoAndInputBuffering() {
-	getState(&s.originalSttyState)
-	setState(bytes.NewBufferString("cbreak"))
-	setState(bytes.NewBufferString("-echo"))
+	if userIn == os.Stdin && userOut == os.Stdout {
+		getState(&s.originalSttyState)
+		setState(bytes.NewBufferString("cbreak"))
+		setState(bytes.NewBufferString("-echo"))
+	}
 }
 
 // getState gets current state of terminal
 func getState(state *bytes.Buffer) error {
-	cmd := exec.Command("stty", "-g")
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = state
-	return cmd.Run()
+	// Only manipulate terminal state when using OS stdio
+	if userIn == os.Stdin {
+		cmd := exec.Command("stty", "-g")
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = state
+		return cmd.Run()
+	}
+	return nil
 }
 
 // setState sets the new settings to terminal
 func setState(state *bytes.Buffer) error {
-	cmd := exec.Command("stty", state.String())
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	return cmd.Run()
+	// Only manipulate terminal state when using OS stdio
+	if userIn == os.Stdin && userOut == os.Stdout {
+		cmd := exec.Command("stty", state.String())
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		return cmd.Run()
+	}
+	return nil
 }
 
 // stop restores the terminal settings and exits
@@ -68,7 +98,7 @@ func (s *ShellSession) handleKeyboardInput(log log.T) (err error) {
 	s.disableEchoAndInputBuffering()
 
 	stdinBytes := make([]byte, StdinBufferLimit)
-	reader := bufio.NewReader(os.Stdin)
+	reader := bufio.NewReader(userIn)
 	for {
 		if stdinBytesLen, err = reader.Read(stdinBytes); err != nil {
 			log.Errorf("Unable read from Stdin: %v", err)
