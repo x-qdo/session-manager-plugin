@@ -89,6 +89,15 @@ type Session struct {
 	Region                string
 	Signer                *v4.Signer
 	Credentials           aws.Credentials
+	Output                io.Writer // Configurable output destination for status messages
+}
+
+// Out returns the configured output writer, defaulting to os.Stdout.
+func (s *Session) Out() io.Writer {
+	if s.Output != nil {
+		return s.Output
+	}
+	return os.Stdout
 }
 
 // startSession create the datachannel for session
@@ -224,7 +233,7 @@ func ValidateInputAndStartSession(args []string, out io.Writer) {
 
 // Execute create data channel and start the session
 func (s *Session) Execute(log log.T) (err error) {
-	fmt.Fprintf(os.Stdout, "\nStarting session with SessionId: %s\n", s.SessionId)
+	fmt.Fprintf(s.Out(), "\nStarting session with SessionId: %s\n", s.SessionId)
 
 	// sets the display mode
 	s.DisplayMode = sessionutil.NewDisplayMode(log)

@@ -58,17 +58,17 @@ func (s *ShellSession) Stop() {
 	os.Exit(0)
 }
 
-// handleKeyboardInput handles input entered by customer on terminal
 func (s *ShellSession) handleKeyboardInput(log log.T) (err error) {
-	var (
-		stdinBytesLen int
-	)
+	var stdinBytesLen int
 
-	//handle double echo and disable input buffering
 	s.disableEchoAndInputBuffering()
 
 	stdinBytes := make([]byte, StdinBufferLimit)
-	reader := bufio.NewReader(os.Stdin)
+	var input = GetInput()
+	if input == nil {
+		input = os.Stdin
+	}
+	reader := bufio.NewReader(input)
 	for {
 		if stdinBytesLen, err = reader.Read(stdinBytes); err != nil {
 			log.Errorf("Unable read from Stdin: %v", err)
@@ -79,7 +79,6 @@ func (s *ShellSession) handleKeyboardInput(log log.T) (err error) {
 			log.Errorf("Failed to send UTF8 char: %v", err)
 			break
 		}
-		// sleep to limit the rate of data transfer
 		time.Sleep(time.Millisecond)
 	}
 	return

@@ -61,6 +61,15 @@ type MuxPortForwarding struct {
 	session        session.Session
 	muxClient      *MuxClient
 	mgsConn        *MgsConn
+	output         io.Writer // Configurable output destination for status messages
+}
+
+// out returns the configured output writer, defaulting to os.Stdout.
+func (p *MuxPortForwarding) out() io.Writer {
+	if p.output != nil {
+		return p.output
+	}
+	return os.Stdout
 }
 
 func (c *MgsConn) close() {
@@ -131,7 +140,7 @@ func (p *MuxPortForwarding) WriteStream(outputMessage message.ClientMessage) err
 		binary.Read(buf, binary.BigEndian, &flag)
 
 		if message.ConnectToPortError == flag {
-			fmt.Printf("\nConnection to destination port failed, check SSM Agent logs.\n")
+			fmt.Fprintf(p.out(), "\nConnection to destination port failed, check SSM Agent logs.\n")
 		}
 	}
 	return nil
@@ -190,12 +199,12 @@ func (p *MuxPortForwarding) handleControlSignals(log log.T) {
 	signal.Notify(c, sessionutil.ControlSignals...)
 	go func() {
 		<-c
-		fmt.Println("Terminate signal received, exiting.")
+		fmt.Fprintln(p.out(), "Terminate signal received, exiting.")
 
 		if err := p.session.DataChannel.SendFlag(log, message.TerminateSession); err != nil {
 			log.Errorf("Failed to send TerminateSession flag: %v", err)
 		}
-		fmt.Fprintf(os.Stdout, "\n\nExiting session with sessionId: %s.\n\n", p.sessionId)
+		fmt.Fprintf(p.out(), "\n\nExiting session with sessionId: %s.\n\n", p.sessionId)
 		p.Stop()
 	}()
 }
@@ -264,10 +273,10 @@ func (p *MuxPortForwarding) handleClientConnections(log log.T, ctx context.Conte
 	defer listener.Close()
 
 	log.Infof(displayMsg)
-	fmt.Printf("%s", displayMsg)
+	fmt.Fprintf(p.out(), "%s", displayMsg)
 
 	log.Infof("Waiting for connections...\n")
-	fmt.Printf("\nWaiting for connections...\n")
+	fmt.Fprintf(p.out(), "\nWaiting for connections...\n")
 
 	var once sync.Once
 	for {
@@ -281,7 +290,7 @@ func (p *MuxPortForwarding) handleClientConnections(log log.T, ctx context.Conte
 				log.Infof("Connection accepted from %s\n for session [%s]", conn.RemoteAddr(), p.sessionId)
 
 				once.Do(func() {
-					fmt.Printf("\nConnection accepted for session [%s]\n", p.sessionId)
+					fmt.Fprintf(p.out(), "\nConnection accepted for session [%s]\n", p.sessionId)
 				})
 
 				stream, err := p.muxClient.session.OpenStream()
