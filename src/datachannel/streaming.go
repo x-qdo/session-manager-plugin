@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"reflect"
@@ -116,6 +117,17 @@ type DataChannel struct {
 
 	// AgentVersion received during handshake
 	agentVersion string
+
+	// Output is the configurable destination for status messages (defaults to os.Stdout)
+	Output io.Writer
+}
+
+// out returns the configured output writer, defaulting to os.Stdout.
+func (dataChannel *DataChannel) out() io.Writer {
+	if dataChannel.Output != nil {
+		return dataChannel.Output
+	}
+	return os.Stdout
 }
 
 type ListMessageBuffer struct {
@@ -511,7 +523,7 @@ func (dataChannel *DataChannel) handleHandshakeComplete(log log.T, clientMessage
 		handshakeComplete.HandshakeTimeToComplete.Seconds())
 
 	if handshakeComplete.CustomerMessage != "" {
-		fmt.Fprintln(os.Stdout, handshakeComplete.CustomerMessage)
+		fmt.Fprintln(dataChannel.out(), handshakeComplete.CustomerMessage)
 	}
 
 	return err
@@ -784,9 +796,9 @@ func (dataChannel DataChannel) HandleChannelClosedMessage(log log.T, stopHandler
 
 	log.Infof("Exiting session with sessionId: %s with output: %s", sessionId, channelClosedMessage.Output)
 	if channelClosedMessage.Output == "" {
-		fmt.Fprintf(os.Stdout, "\n\nExiting session with sessionId: %s.\n\n", sessionId)
+		fmt.Fprintf(dataChannel.out(), "\n\nExiting session with sessionId: %s.\n\n", sessionId)
 	} else {
-		fmt.Fprintf(os.Stdout, "\n\nSessionId: %s : %s\n\n", sessionId, channelClosedMessage.Output)
+		fmt.Fprintf(dataChannel.out(), "\n\nSessionId: %s : %s\n\n", sessionId, channelClosedMessage.Output)
 	}
 
 	stopHandler()

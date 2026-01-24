@@ -70,12 +70,14 @@ func (s *PortSession) Initialize(log log.T, sessionVar *session.Session) {
 				sessionId:      s.SessionId,
 				portParameters: s.portParameters,
 				session:        s.Session,
+				output:         sessionVar.Output,
 			}
 		} else {
 			s.portSessionType = &BasicPortForwarding{
 				sessionId:      s.SessionId,
 				portParameters: s.portParameters,
 				session:        s.Session,
+				output:         sessionVar.Output,
 			}
 		}
 	} else {
