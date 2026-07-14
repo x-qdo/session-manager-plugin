@@ -23,7 +23,6 @@ import (
 	"io"
 	"net"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"strconv"
 	"sync"
@@ -96,7 +95,9 @@ func (p *MuxPortForwarding) Stop() {
 		p.muxClient.close()
 	}
 	p.cleanUp()
-	exitFunc(0)
+	if !p.session.EmbeddedMode {
+		exitFunc(0)
+	}
 }
 
 // InitializeStreams initializes i/o streams
@@ -195,8 +196,12 @@ func (p *MuxPortForwarding) initialize(log log.T, agentVersion string) (err erro
 
 // handleControlSignals handles terminate signals
 func (p *MuxPortForwarding) handleControlSignals(log log.T) {
+	if p.session.EmbeddedMode {
+		return
+	}
+
 	c := make(chan os.Signal, 1)
-	signal.Notify(c, sessionutil.ControlSignals...)
+	notifySignals(c, sessionutil.ControlSignals...)
 	go func() {
 		<-c
 		fmt.Fprintln(p.out(), "Terminate signal received, exiting.")

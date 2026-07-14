@@ -45,6 +45,12 @@ type DisplayMode struct {
 }
 
 func (d *DisplayMode) InitDisplayMode(log log.T) {
+	if _, ok := configuredUserOut(); ok {
+		originalCP = 0
+		originalOutCP = 0
+		return
+	}
+
 	var (
 		state          uint32
 		fileDescriptor int
@@ -81,6 +87,13 @@ func (d *DisplayMode) InitDisplayMode(log log.T) {
 
 // DisplayMessage function displays the output on the screen
 func (d *DisplayMode) DisplayMessage(log log.T, message message.ClientMessage) {
+	if out, ok := configuredUserOut(); ok {
+		if _, err := out.Write(message.Payload); err != nil {
+			log.Errorf("error occurred while writing shell output: %v", err)
+		}
+		return
+	}
+
 	var (
 		done *uint32
 		err  error
@@ -92,7 +105,6 @@ func (d *DisplayMode) DisplayMessage(log log.T, message message.ClientMessage) {
 		log.Errorf("error occurred while writing to file: %v", err)
 		fmt.Fprintf(os.Stdout, "\nError getting the output. %s\n", err.Error())
 		RestoreConsoleCodePages()
-		os.Exit(0)
 	}
 }
 

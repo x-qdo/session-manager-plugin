@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/aws/session-manager-plugin/src/log"
+	"github.com/aws/session-manager-plugin/src/sessionmanagerplugin/session/sessionutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -71,7 +72,7 @@ func TestSetSessionHandlers(t *testing.T) {
 		acceptConnection = func(log log.T, listener net.Listener) (tcpConn net.Conn, err error) {
 			return in, nil
 		}
-		signal.Notify(signalCh, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTSTP)
+		signal.Notify(signalCh, sessionutil.ControlSignals...)
 		process, _ := os.FindProcess(os.Getpid())
 		process.Signal(syscall.SIGINT)
 		portSession.SetSessionHandlers(mockLog)

@@ -25,8 +25,8 @@ import (
 	"time"
 
 	"github.com/aws/session-manager-plugin/src/log"
+	"github.com/aws/session-manager-plugin/src/uuid"
 	"github.com/stretchr/testify/assert"
-	"github.com/twinj/uuid"
 )
 
 type EXPECTATION int
@@ -833,13 +833,13 @@ func TestPutUuid(t *testing.T) {
 			defaultUuid,
 		},
 		{
-			"Nil uuid",
-			ERROR,
+			"Zero UUID",
+			SUCCESS,
 			get16ByteBuffer(),
 			0,
 			0,
 			"00000000-0000-0000-0000-000000000000",
-			"null",
+			"00000000-0000-0000-0000-000000000000",
 		},
 		{
 			"Bad offset",

@@ -69,12 +69,16 @@ func (p *BasicPortForwarding) IsStreamNotSet() (status bool) {
 // exitFunc allows tests to override os.Exit behavior.
 var exitFunc = os.Exit
 
+var notifySignals = signal.Notify
+
 // Stop closes the stream
 func (p *BasicPortForwarding) Stop() {
 	if p.stream != nil {
 		(*p.stream).Close()
 	}
-	exitFunc(0)
+	if !p.session.EmbeddedMode {
+		exitFunc(0)
+	}
 }
 
 // InitializeStreams establishes connection and initializes the stream
@@ -194,8 +198,12 @@ func (p *BasicPortForwarding) startLocalListener(log log.T, portNumber string) (
 
 // handleControlSignals handles terminate signals
 func (p *BasicPortForwarding) handleControlSignals(log log.T) {
+	if p.session.EmbeddedMode {
+		return
+	}
+
 	c := make(chan os.Signal, 1)
-	signal.Notify(c, sessionutil.ControlSignals...)
+	notifySignals(c, sessionutil.ControlSignals...)
 	go func() {
 		<-c
 		fmt.Fprintln(p.out(), "Terminate signal received, exiting.")

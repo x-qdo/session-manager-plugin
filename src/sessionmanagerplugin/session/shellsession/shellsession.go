@@ -15,8 +15,10 @@
 package shellsession
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
+	"io"
 	"os"
 	"os/signal"
 	"time"
@@ -38,13 +40,16 @@ type ShellSession struct {
 	session.Session
 
 	// SizeData is used to store size data at session level to compare with new size.
-	SizeData          message.SizeData
-	originalSttyState bytes.Buffer
+	SizeData           message.SizeData
+	originalSttyState  bytes.Buffer
+	terminalConfigured bool
 }
 
 var GetTerminalSizeCall = func(fd int) (width int, height int, err error) {
 	return terminal.GetSize(fd)
 }
+
+var notifySignals = signal.Notify
 
 func init() {
 	session.Register(&ShellSession{})
@@ -79,11 +84,38 @@ func (s *ShellSession) SetSessionHandlers(log log.T) (err error) {
 	return
 }
 
+// handleInput reads bytes from an injected stream and forwards them to the
+// data channel. It is shared by Unix and Windows embedded sessions.
+func (s *ShellSession) handleInput(log log.T, input io.Reader) (err error) {
+	reader := bufio.NewReader(input)
+	stdinBytes := make([]byte, StdinBufferLimit)
+	for {
+		stdinBytesLen, readErr := reader.Read(stdinBytes)
+		if stdinBytesLen > 0 {
+			if err = s.Session.DataChannel.SendInputDataMessage(log, message.Output, stdinBytes[:stdinBytesLen]); err != nil {
+				log.Errorf("Failed to send UTF8 char: %v", err)
+				return err
+			}
+			time.Sleep(time.Millisecond)
+		}
+		if readErr != nil {
+			if readErr != io.EOF {
+				log.Errorf("Unable read from Stdin: %v", readErr)
+			}
+			return readErr
+		}
+	}
+}
+
 // handleControlSignals handles control signals when given by user
 func (s *ShellSession) handleControlSignals(log log.T) {
+	if s.EmbeddedMode {
+		return
+	}
+
+	signals := make(chan os.Signal, 1)
+	notifySignals(signals, sessionutil.ControlSignals...)
 	go func() {
-		signals := make(chan os.Signal, 1)
-		signal.Notify(signals, sessionutil.ControlSignals...)
 		for {
 			sig := <-signals
 			if b, ok := sessionutil.SignalsByteMap[sig]; ok {

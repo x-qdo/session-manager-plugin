@@ -16,6 +16,8 @@ package shellsession
 import (
 	"io"
 	"sync"
+
+	"github.com/aws/session-manager-plugin/src/sessionmanagerplugin/session/sessionutil"
 )
 
 var (
@@ -31,6 +33,7 @@ func ConfigureIO(in io.Reader, out io.Writer) {
 	defer ioMu.Unlock()
 	customIn = in
 	customOut = out
+	sessionutil.SetUserOut(out)
 }
 
 // GetInput returns the configured input reader, or nil if using default.

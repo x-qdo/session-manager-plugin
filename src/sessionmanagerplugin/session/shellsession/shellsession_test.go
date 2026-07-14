@@ -15,10 +15,13 @@
 package shellsession
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"testing"
@@ -52,7 +55,7 @@ func TestName(t *testing.T) {
 }
 
 func TestInitialize(t *testing.T) {
-	session := &session.Session{}
+	session := &session.Session{EmbeddedMode: true}
 	shellSession := ShellSession{}
 	session.DataChannel = mockDataChannel
 	mockDataChannel.On("RegisterOutputStreamHandler", mock.Anything, true).Times(1)
@@ -60,6 +63,7 @@ func TestInitialize(t *testing.T) {
 	mockWsChannel.On("SetOnMessage", mock.Anything)
 	shellSession.Initialize(logger, session)
 	assert.Equal(t, shellSession.Session, *session)
+	assert.True(t, shellSession.EmbeddedMode)
 }
 
 func TestHandleControlSignals(t *testing.T) {
@@ -79,7 +83,7 @@ func TestHandleControlSignals(t *testing.T) {
 	signalCh := make(chan os.Signal, 1)
 	go func() {
 		p, _ := os.FindProcess(os.Getpid())
-		signal.Notify(signalCh, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTSTP)
+		signal.Notify(signalCh, sessionutil.ControlSignals...)
 		shellSession.handleControlSignals(logger)
 		p.Signal(syscall.SIGINT)
 		time.Sleep(200 * time.Millisecond)
@@ -89,6 +93,53 @@ func TestHandleControlSignals(t *testing.T) {
 	<-waitCh
 	assert.Equal(t, <-signalCh, syscall.SIGINT)
 	assert.Equal(t, counter, 1)
+}
+
+func TestConfigureIORoutesShellInputAndOutput(t *testing.T) {
+	input := strings.NewReader("whoami\n")
+	var output bytes.Buffer
+	ConfigureIO(input, &output)
+	defer ConfigureIO(nil, nil)
+
+	assert.Same(t, input, GetInput())
+	assert.Same(t, &output, GetOutput())
+
+	displayMode := sessionutil.NewDisplayMode(logger)
+	displayMode.DisplayMessage(logger, message.ClientMessage{Payload: []byte("remote output")})
+	assert.Equal(t, "remote output", output.String())
+}
+
+func TestHandleInputUsesConfiguredReader(t *testing.T) {
+	dataChannel := &dataChannelMock.IDataChannel{}
+	dataChannel.On("SendInputDataMessage", mock.Anything, message.Output, []byte("whoami\n")).Return(nil).Once()
+
+	shellSession := ShellSession{
+		Session: session.Session{
+			DataChannel:  dataChannel,
+			EmbeddedMode: true,
+		},
+	}
+
+	err := shellSession.handleInput(logger, strings.NewReader("whoami\n"))
+	assert.ErrorIs(t, err, io.EOF)
+	dataChannel.AssertExpectations(t)
+}
+
+func TestStopReturnsInEmbeddedMode(t *testing.T) {
+	shellSession := ShellSession{Session: session.Session{EmbeddedMode: true}}
+	shellSession.Stop()
+}
+
+func TestEmbeddedModeDoesNotRegisterSignals(t *testing.T) {
+	originalNotify := notifySignals
+	notifyCalled := false
+	notifySignals = func(chan<- os.Signal, ...os.Signal) { notifyCalled = true }
+	defer func() { notifySignals = originalNotify }()
+
+	shellSession := ShellSession{Session: session.Session{EmbeddedMode: true}}
+	shellSession.handleControlSignals(logger)
+
+	assert.False(t, notifyCalled)
 }
 
 func TestSendInputDataMessageWithPayloadTypeSize(t *testing.T) {

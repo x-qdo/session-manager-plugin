@@ -57,11 +57,17 @@ var specialKeysInputMap = map[keyboard.Key][]byte{
 // stop restores the terminal settings and exits
 func (s *ShellSession) Stop() {
 	sessionutil.RestoreConsoleCodePages()
-	os.Exit(0)
+	if !s.EmbeddedMode {
+		os.Exit(0)
+	}
 }
 
 // handleKeyboardInput handles input entered by customer on terminal
 func (s *ShellSession) handleKeyboardInput(log log.T) (err error) {
+	if input := GetInput(); input != nil {
+		return s.handleInput(log, input)
+	}
+
 	var (
 		character rune         //character input from keyboard
 		key       keyboard.Key //special keys like arrows and function keys
@@ -84,7 +90,7 @@ func (s *ShellSession) handleKeyboardInput(log log.T) (err error) {
 				break
 			}
 		} else if key != 0 {
-			keyBytes := []byte(string(key))
+			keyBytes := []byte(string(rune(key)))
 			if byteValue, ok := specialKeysInputMap[key]; ok {
 				keyBytes = byteValue
 			}

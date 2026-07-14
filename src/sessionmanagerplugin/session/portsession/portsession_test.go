@@ -38,11 +38,13 @@ func TestInitializePortSession(t *testing.T) {
 	portSession := PortSession{
 		Session: getSessionMock(),
 	}
+	portSession.EmbeddedMode = true
 	portSession.Initialize(mockLog, &portSession.Session)
 
 	mockWebSocketChannel.AssertExpectations(t)
 	assert.Equal(t, portParameters, portSession.portParameters, "Initialize port parameters")
 	assert.IsType(t, &StandardStreamForwarding{}, portSession.portSessionType)
+	assert.True(t, portSession.portSessionType.(*StandardStreamForwarding).session.EmbeddedMode)
 }
 
 func TestInitializePortSessionForPortForwardingWithOldAgent(t *testing.T) {
@@ -54,11 +56,13 @@ func TestInitializePortSessionForPortForwardingWithOldAgent(t *testing.T) {
 	portSession := PortSession{
 		Session: getSessionMockWithParams(portParameters, "2.2.0.0"),
 	}
+	portSession.EmbeddedMode = true
 	portSession.Initialize(mockLog, &portSession.Session)
 
 	mockWebSocketChannel.AssertExpectations(t)
 	assert.Equal(t, portParameters, portSession.portParameters, "Initialize port parameters")
 	assert.IsType(t, &BasicPortForwarding{}, portSession.portSessionType)
+	assert.True(t, portSession.portSessionType.(*BasicPortForwarding).session.EmbeddedMode)
 }
 
 func TestInitializePortSessionForPortForwarding(t *testing.T) {
@@ -70,11 +74,13 @@ func TestInitializePortSessionForPortForwarding(t *testing.T) {
 	portSession := PortSession{
 		Session: getSessionMockWithParams(portParameters, "3.1.0.0"),
 	}
+	portSession.EmbeddedMode = true
 	portSession.Initialize(mockLog, &portSession.Session)
 
 	mockWebSocketChannel.AssertExpectations(t)
 	assert.Equal(t, portParameters, portSession.portParameters, "Initialize port parameters")
 	assert.IsType(t, &MuxPortForwarding{}, portSession.portSessionType)
+	assert.True(t, portSession.portSessionType.(*MuxPortForwarding).session.EmbeddedMode)
 }
 
 func TestStartSessionWithClosedWsConn(t *testing.T) {

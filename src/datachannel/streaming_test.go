@@ -32,11 +32,11 @@ import (
 	"github.com/aws/session-manager-plugin/src/encryption/mocks"
 	"github.com/aws/session-manager-plugin/src/log"
 	"github.com/aws/session-manager-plugin/src/message"
+	"github.com/aws/session-manager-plugin/src/uuid"
 	"github.com/aws/session-manager-plugin/src/version"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/twinj/uuid"
 )
 
 var (

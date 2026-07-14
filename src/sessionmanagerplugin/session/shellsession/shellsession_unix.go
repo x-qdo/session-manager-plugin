@@ -18,21 +18,25 @@
 package shellsession
 
 import (
-	"bufio"
 	"bytes"
 	"os"
 	"os/exec"
-	"time"
 
 	"github.com/aws/session-manager-plugin/src/log"
-	"github.com/aws/session-manager-plugin/src/message"
 )
 
 // disableEchoAndInputBuffering disables echo to avoid double echo and disable input buffering
 func (s *ShellSession) disableEchoAndInputBuffering() {
-	getState(&s.originalSttyState)
-	setState(bytes.NewBufferString("cbreak"))
-	setState(bytes.NewBufferString("-echo"))
+	if getState(&s.originalSttyState) != nil {
+		return
+	}
+	s.terminalConfigured = true
+	if setState(bytes.NewBufferString("cbreak")) != nil {
+		return
+	}
+	if setState(bytes.NewBufferString("-echo")) != nil {
+		return
+	}
 }
 
 // getState gets current state of terminal
@@ -53,33 +57,20 @@ func setState(state *bytes.Buffer) error {
 
 // stop restores the terminal settings and exits
 func (s *ShellSession) Stop() {
-	setState(&s.originalSttyState)
-	setState(bytes.NewBufferString("echo")) // for linux and ubuntu
-	os.Exit(0)
+	if s.terminalConfigured {
+		setState(&s.originalSttyState)
+		setState(bytes.NewBufferString("echo")) // for linux and ubuntu
+	}
+	if !s.EmbeddedMode {
+		os.Exit(0)
+	}
 }
 
 func (s *ShellSession) handleKeyboardInput(log log.T) (err error) {
-	var stdinBytesLen int
-
-	s.disableEchoAndInputBuffering()
-
-	stdinBytes := make([]byte, StdinBufferLimit)
-	var input = GetInput()
+	input := GetInput()
 	if input == nil {
+		s.disableEchoAndInputBuffering()
 		input = os.Stdin
 	}
-	reader := bufio.NewReader(input)
-	for {
-		if stdinBytesLen, err = reader.Read(stdinBytes); err != nil {
-			log.Errorf("Unable read from Stdin: %v", err)
-			break
-		}
-
-		if err = s.Session.DataChannel.SendInputDataMessage(log, message.Output, stdinBytes[:stdinBytesLen]); err != nil {
-			log.Errorf("Failed to send UTF8 char: %v", err)
-			break
-		}
-		time.Sleep(time.Millisecond)
-	}
-	return
+	return s.handleInput(log, input)
 }

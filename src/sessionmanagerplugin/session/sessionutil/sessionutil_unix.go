@@ -19,37 +19,11 @@ package sessionutil
 
 import (
 	"fmt"
-	"io"
 	"net"
-	"os"
-	"sync"
 
 	"github.com/aws/session-manager-plugin/src/log"
 	"github.com/aws/session-manager-plugin/src/message"
 )
-
-var (
-	userOutMu sync.RWMutex
-	userOut   io.Writer
-)
-
-// SetUserOut sets a custom output writer for DisplayMessage.
-// Pass nil to reset to default (os.Stdout).
-func SetUserOut(w io.Writer) {
-	userOutMu.Lock()
-	defer userOutMu.Unlock()
-	userOut = w
-}
-
-// getUserOut returns the configured output writer, defaulting to os.Stdout.
-func getUserOut() io.Writer {
-	userOutMu.RLock()
-	defer userOutMu.RUnlock()
-	if userOut != nil {
-		return userOut
-	}
-	return os.Stdout
-}
 
 type DisplayMode struct {
 }

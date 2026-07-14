@@ -40,8 +40,15 @@ func (p *StandardStreamForwarding) IsStreamNotSet() (status bool) {
 
 // Stop closes the streams
 func (p *StandardStreamForwarding) Stop() {
-	p.inputStream.Close()
-	p.outputStream.Close()
+	if p.session.EmbeddedMode {
+		return
+	}
+	if p.inputStream != nil {
+		p.inputStream.Close()
+	}
+	if p.outputStream != nil {
+		p.outputStream.Close()
+	}
 	os.Exit(0)
 }
 

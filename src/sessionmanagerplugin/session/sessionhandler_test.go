@@ -58,6 +58,11 @@ func TestOpenDataChannelWithNoCredential(t *testing.T) {
 	assert.Nil(t, err)
 }
 
+func TestStopReturnsInEmbeddedMode(t *testing.T) {
+	session := &Session{EmbeddedMode: true}
+	session.Stop()
+}
+
 func TestOpenDataChannel(t *testing.T) {
 	mockDataChannel = &dataChannelMock.IDataChannel{}
 	mockWsChannel = &wsChannelMock.IWebSocketChannel{}

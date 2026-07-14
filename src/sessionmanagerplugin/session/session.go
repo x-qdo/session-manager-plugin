@@ -33,8 +33,8 @@ import (
 	"github.com/aws/session-manager-plugin/src/retry"
 	"github.com/aws/session-manager-plugin/src/sdkutil"
 	"github.com/aws/session-manager-plugin/src/sessionmanagerplugin/session/sessionutil"
+	"github.com/aws/session-manager-plugin/src/uuid"
 	"github.com/aws/session-manager-plugin/src/version"
-	"github.com/twinj/uuid"
 )
 
 const (
@@ -90,6 +90,9 @@ type Session struct {
 	Signer                *v4.Signer
 	Credentials           aws.Credentials
 	Output                io.Writer // Configurable output destination for status messages
+	// EmbeddedMode keeps lifecycle control with the caller. When enabled, the
+	// plugin does not install process signal handlers or terminate the process.
+	EmbeddedMode bool
 }
 
 // Out returns the configured output writer, defaulting to os.Stdout.
@@ -153,7 +156,6 @@ func ValidateInputAndStartSession(args []string, out io.Writer) {
 		target             string
 	)
 	log := log.Logger(true, "session-manager-plugin")
-	uuid.SwitchFormat(uuid.CleanHyphen)
 
 	if len(args) == 1 {
 		fmt.Fprint(out, "\nThe Session Manager plugin was installed successfully. "+
@@ -200,7 +202,7 @@ func ValidateInputAndStartSession(args []string, out io.Writer) {
 		}
 	}
 	sdkutil.SetRegionAndProfile(region, profile)
-	clientId := uuid.NewV4().String()
+	clientId := uuid.New().String()
 
 	switch operationName {
 	case StartSessionOperation:
